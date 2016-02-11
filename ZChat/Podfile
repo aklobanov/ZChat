@@ -1,0 +1,8 @@
+source 'https://github.com/CocoaPods/Specs.git'
+platform :ios, '8.0'
+target 'ZChat' do
+pod 'SWRevealViewController'
+pod 'JSQMessagesViewController'
+pod 'MBProgressHUD'
+pod 'ObjCZMQ', :git => 'https://github.com/aklobanov/ObjCZMQ.git'
+end
