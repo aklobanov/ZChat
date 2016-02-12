@@ -8,15 +8,39 @@
 
 #import "MessageViewController.h"
 #import "SWRevealViewController.h"
+#import "ModelData.h"
 
-@interface MessageViewController () <SWRevealViewControllerDelegate>
+#define LOCAL_LEVEL_0 0
+#define LOCAL_LEVEL_1 1
+#define LOCAL_LEVEL_2 2
+
+@interface MessageViewController () <SWRevealViewControllerDelegate,ModelDataProtocol>
 @property (weak, nonatomic) IBOutlet UIBarButtonItem *revealButton;
-
 @end
 
 @implementation MessageViewController
-
-- (void)viewDidLoad {
+{
+    ModelData               *_modelData;
+    JSQMessagesBubbleImage  *_outgoingBubbleImageData;
+    JSQMessagesBubbleImage  *_incomingBubbleImageData;
+}
+#pragma mark - VIEW
+- (void)awakeFromNib
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    [super awakeFromNib];
+    _modelData = [ModelData sharedModelData];
+    JSQMessagesBubbleImageFactory *bubbleFactory = [[JSQMessagesBubbleImageFactory alloc] init];
+    _outgoingBubbleImageData = [bubbleFactory outgoingMessagesBubbleImageWithColor:[UIColor jsq_messageBubbleLightGrayColor]];
+    _incomingBubbleImageData = [bubbleFactory incomingMessagesBubbleImageWithColor:[UIColor jsq_messageBubbleBlueColor]];
+}
+- (void)viewDidLoad
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
     [super viewDidLoad];
     SWRevealViewController *revealViewController = [self revealViewController];
     if (revealViewController != nil)
@@ -27,208 +51,129 @@
         [[[self navigationController] navigationBar] addGestureRecognizer:[revealViewController tapGestureRecognizer]];
         [revealViewController setDelegate:self];
     }
+    [_modelData setDelegate:self];
 }
-
-- (void)didReceiveMemoryWarning {
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
-}
-#pragma mark - Actions
-
-- (void)receiveMessagePressed:(UIBarButtonItem *)sender
+- (void)dealloc
 {
-    /**
-     *  DEMO ONLY
-     *
-     *  The following is simply to simulate received messages for the demo.
-     *  Do not actually do this.
-     */
-    
-    
-    /**
-     *  Show the typing indicator to be shown
-     */
-    self.showTypingIndicator = !self.showTypingIndicator;
-    
-    /**
-     *  Scroll to actually view the indicator
-     */
-    [self scrollToBottomAnimated:YES];
-    
-    /**
-     *  Copy last sent message, this will be the new "received" message
-     */
-    JSQMessage *copyMessage = [[self.demoData.messages lastObject] copy];
-    
-    if (!copyMessage) {
-        copyMessage = [JSQMessage messageWithSenderId:kJSQDemoAvatarIdJobs
-                                          displayName:kJSQDemoAvatarDisplayNameJobs
-                                                 text:@"First received!"];
-    }
-    
-    /**
-     *  Allow typing indicator to show
-     */
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        
-        NSMutableArray *userIds = [[self.demoData.users allKeys] mutableCopy];
-        [userIds removeObject:self.senderId];
-        NSString *randomUserId = userIds[arc4random_uniform((int)[userIds count])];
-        
-        JSQMessage *newMessage = nil;
-        id<JSQMessageMediaData> newMediaData = nil;
-        id newMediaAttachmentCopy = nil;
-        
-        if (copyMessage.isMediaMessage) {
-            /**
-             *  Last message was a media message
-             */
-            id<JSQMessageMediaData> copyMediaData = copyMessage.media;
-            
-            if ([copyMediaData isKindOfClass:[JSQPhotoMediaItem class]]) {
-                JSQPhotoMediaItem *photoItemCopy = [((JSQPhotoMediaItem *)copyMediaData) copy];
-                photoItemCopy.appliesMediaViewMaskAsOutgoing = NO;
-                newMediaAttachmentCopy = [UIImage imageWithCGImage:photoItemCopy.image.CGImage];
-                
-                /**
-                 *  Set image to nil to simulate "downloading" the image
-                 *  and show the placeholder view
-                 */
-                photoItemCopy.image = nil;
-                
-                newMediaData = photoItemCopy;
-            }
-            else if ([copyMediaData isKindOfClass:[JSQLocationMediaItem class]]) {
-                JSQLocationMediaItem *locationItemCopy = [((JSQLocationMediaItem *)copyMediaData) copy];
-                locationItemCopy.appliesMediaViewMaskAsOutgoing = NO;
-                newMediaAttachmentCopy = [locationItemCopy.location copy];
-                
-                /**
-                 *  Set location to nil to simulate "downloading" the location data
-                 */
-                locationItemCopy.location = nil;
-                
-                newMediaData = locationItemCopy;
-            }
-            else if ([copyMediaData isKindOfClass:[JSQVideoMediaItem class]]) {
-                JSQVideoMediaItem *videoItemCopy = [((JSQVideoMediaItem *)copyMediaData) copy];
-                videoItemCopy.appliesMediaViewMaskAsOutgoing = NO;
-                newMediaAttachmentCopy = [videoItemCopy.fileURL copy];
-                
-                /**
-                 *  Reset video item to simulate "downloading" the video
-                 */
-                videoItemCopy.fileURL = nil;
-                videoItemCopy.isReadyToPlay = NO;
-                
-                newMediaData = videoItemCopy;
-            }
-            else {
-                NSLog(@"%s error: unrecognized media item", __PRETTY_FUNCTION__);
-            }
-            
-            newMessage = [JSQMessage messageWithSenderId:randomUserId
-                                             displayName:self.demoData.users[randomUserId]
-                                                   media:newMediaData];
-        }
-        else {
-            /**
-             *  Last message was a text message
-             */
-            newMessage = [JSQMessage messageWithSenderId:randomUserId
-                                             displayName:self.demoData.users[randomUserId]
-                                                    text:copyMessage.text];
-        }
-        
-        /**
-         *  Upon receiving a message, you should:
-         *
-         *  1. Play sound (optional)
-         *  2. Add new id<JSQMessageData> object to your data source
-         *  3. Call `finishReceivingMessage`
-         */
-        [JSQSystemSoundPlayer jsq_playMessageReceivedSound];
-        [self.demoData.messages addObject:newMessage];
-        [self finishReceivingMessageAnimated:YES];
-        
-        
-        if (newMessage.isMediaMessage) {
-            /**
-             *  Simulate "downloading" media
-             */
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                /**
-                 *  Media is "finished downloading", re-display visible cells
-                 *
-                 *  If media cell is not visible, the next time it is dequeued the view controller will display its new attachment data
-                 *
-                 *  Reload the specific item, or simply call `reloadData`
-                 */
-                
-                if ([newMediaData isKindOfClass:[JSQPhotoMediaItem class]]) {
-                    ((JSQPhotoMediaItem *)newMediaData).image = newMediaAttachmentCopy;
-                    [self.collectionView reloadData];
-                }
-                else if ([newMediaData isKindOfClass:[JSQLocationMediaItem class]]) {
-                    [((JSQLocationMediaItem *)newMediaData)setLocation:newMediaAttachmentCopy withCompletionHandler:^{
-                        [self.collectionView reloadData];
-                    }];
-                }
-                else if ([newMediaData isKindOfClass:[JSQVideoMediaItem class]]) {
-                    ((JSQVideoMediaItem *)newMediaData).fileURL = newMediaAttachmentCopy;
-                    ((JSQVideoMediaItem *)newMediaData).isReadyToPlay = YES;
-                    [self.collectionView reloadData];
-                }
-                else {
-                    NSLog(@"%s error: unrecognized media item", __PRETTY_FUNCTION__);
-                }
-                
-            });
-        }
-        
-    });
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    _modelData = nil;
 }
-
+- (void)didReceiveMemoryWarning
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    [super didReceiveMemoryWarning];
+}
+#pragma mark - ROTATION
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    return (UIInterfaceOrientationMaskPortrait | UIInterfaceOrientationMaskLandscape);
+}
+- (BOOL)shouldAutorotate
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    return YES;
+}
+#pragma mark - DELEGATE: SWRevealViewController
+- (void)revealController:(SWRevealViewController *)revealController willMoveToPosition:(FrontViewPosition)position
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    if (position == FrontViewPositionRight)
+    {
+//        [self searchBarCancelButtonClicked:_searchBar];
+    }
+}
 #pragma mark - JSQMessagesViewController method overrides
-
 - (void)didPressSendButton:(UIButton *)button
            withMessageText:(NSString *)text
                   senderId:(NSString *)senderId
          senderDisplayName:(NSString *)senderDisplayName
                       date:(NSDate *)date
 {
-    /**
-     *  Sending a message. Your implementation of this method should do *at least* the following:
-     *
-     *  1. Play sound (optional)
-     *  2. Add new id<JSQMessageData> object to your data source
-     *  3. Call `finishSendingMessage`
-     */
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
     [JSQSystemSoundPlayer jsq_playMessageSentSound];
-    
     JSQMessage *message = [[JSQMessage alloc] initWithSenderId:senderId
                                              senderDisplayName:senderDisplayName
                                                           date:date
                                                           text:text];
-    
-    [self.demoData.messages addObject:message];
-    
-    [self finishSendingMessageAnimated:YES];
+    __weak typeof(self) weakSelf = self;
+    [_modelData sendMessage:message withCompletion:^(BOOL success, NSError *error) {
+        if (success)
+        {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [weakSelf finishSendingMessageAnimated:YES];
+            });
+        }
+    }];
 }
-
 - (void)didPressAccessoryButton:(UIButton *)sender
 {
-    [self.inputToolbar.contentView.textView resignFirstResponder];
-    
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    [[[[self inputToolbar] contentView] textView] resignFirstResponder];
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"S0", nil)
+                                                                   message:nil
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+//    UIFont *font = [UIFont fontWithName:@"Oswald-Regular" size:18.0f];
+//    NSAttributedString *title = [[NSAttributedString alloc] initWithString:NSLocalizedString(@"S0", nil) attributes:@{NSFontAttributeName:font,NSForegroundColorAttributeName:[UIColor blackColor]}];
+//    [alert setValue:title forKey:@"attributedTitle"];
+    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
+    {
+        UIPopoverPresentationController *popover = [alert popoverPresentationController];
+        [popover setSourceView:[self inputToolbar]];
+        [popover setSourceRect:[[self inputToolbar] bounds]];
+    }
+    UIAlertAction* defaultAction = [UIAlertAction actionWithTitle:NSLocalizedString(@"CANCEL", nil) style:UIAlertActionStyleCancel handler:^(UIAlertAction * action) {}];
+    [defaultAction setValue:[UIColor redColor] forKey:@"titleTextColor"];
+    [alert addAction:defaultAction];
+//    __weak typeof(self) weakSelf = self;
+//    UIColor *color = [UIColor colorWithRed:0.0f green:122.0f/255.0f blue:1.0f alpha:1.0f];
+/*
+    for (NSString *str in [[sortBy allKeys] reverseObjectEnumerator])
+    {
+        UIAlertAction* _action = [UIAlertAction actionWithTitle:str style:UIAlertActionStyleDefault handler:^(UIAlertAction * action) {
+#if DEBUG >= LOCAL_LEVEL_1
+            NSLog(@"ACTION=%@",[action debugDescription]);
+#endif
+            __strong typeof(self) strongSelf = weakSelf;
+            if (![[strongSelf->_sortByButton titleForState:UIControlStateNormal] isEqualToString:[action title]])
+            {
+                [strongSelf->_sortByButton setTitle:[action title] forState:UIControlStateNormal];
+                [strongSelf fetchVideos:YES isFirstFetch:NO];
+            }
+        }];
+        [_action setValue:color forKey:@"titleTextColor"];
+        [alert addAction:_action];
+    }
+*/
+    [self presentViewController:alert animated:YES completion:nil];
+/*
     UIActionSheet *sheet = [[UIActionSheet alloc] initWithTitle:@"Media messages"
                                                        delegate:self
                                               cancelButtonTitle:@"Cancel"
                                          destructiveButtonTitle:nil
                                               otherButtonTitles:@"Send photo", @"Send location", @"Send video", nil];
     
-    [sheet showFromToolbar:self.inputToolbar];
+    [sheet showFromToolbar:[self inputToolbar]];
+*/
 }
-
+/*
 - (void)actionSheet:(UIActionSheet *)actionSheet didDismissWithButtonIndex:(NSInteger)buttonIndex
 {
     if (buttonIndex == actionSheet.cancelButtonIndex) {
@@ -260,41 +205,45 @@
     
     [self finishSendingMessageAnimated:YES];
 }
+*/
 
-
-
-#pragma mark - JSQMessages CollectionView DataSource
+#pragma mark - DATA SOURCE: JSQMessages CollectionView
 
 - (id<JSQMessageData>)collectionView:(JSQMessagesCollectionView *)collectionView messageDataForItemAtIndexPath:(NSIndexPath *)indexPath
 {
-    return [self.demoData.messages objectAtIndex:indexPath.item];
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    return [_modelData messageAtIndexPath:indexPath];
 }
-
 - (void)collectionView:(JSQMessagesCollectionView *)collectionView didDeleteMessageAtIndexPath:(NSIndexPath *)indexPath
 {
-    [self.demoData.messages removeObjectAtIndex:indexPath.item];
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    [_modelData deleteMessageAtIndexPath:indexPath];
 }
 
 - (id<JSQMessageBubbleImageDataSource>)collectionView:(JSQMessagesCollectionView *)collectionView messageBubbleImageDataForItemAtIndexPath:(NSIndexPath *)indexPath
 {
-    /**
-     *  You may return nil here if you do not want bubbles.
-     *  In this case, you should set the background color of your collection view cell's textView.
-     *
-     *  Otherwise, return your previously created bubble image data objects.
-     */
-    
-    JSQMessage *message = [self.demoData.messages objectAtIndex:indexPath.item];
-    
-    if ([message.senderId isEqualToString:self.senderId]) {
-        return self.demoData.outgoingBubbleImageData;
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    JSQMessage *message = [_modelData messageAtIndexPath:indexPath];
+    if ((message != nil) && [[message senderId] isEqualToString:[self senderId]])
+    {
+        return _outgoingBubbleImageData;
     }
-    
-    return self.demoData.incomingBubbleImageData;
+    else
+    {
+        return _incomingBubbleImageData;
+    }
 }
-
 - (id<JSQMessageAvatarImageDataSource>)collectionView:(JSQMessagesCollectionView *)collectionView avatarImageDataForItemAtIndexPath:(NSIndexPath *)indexPath
 {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
     /**
      *  Return `nil` here if you do not want avatars.
      *  If you do return `nil`, be sure to do the following in `viewDidLoad`:
@@ -315,9 +264,14 @@
      *
      *  Override the defaults in `viewDidLoad`
      */
-    JSQMessage *message = [self.demoData.messages objectAtIndex:indexPath.item];
-    
-    if ([message.senderId isEqualToString:self.senderId]) {
+    JSQMessage *message = [_modelData messageAtIndexPath:indexPath];
+    if (message == nil)
+    {
+        return nil;
+    }
+/*
+    if ([[message senderId] isEqualToString:[self senderId]])
+    {
         if (![NSUserDefaults outgoingAvatarSetting]) {
             return nil;
         }
@@ -327,70 +281,62 @@
             return nil;
         }
     }
-    
-    
     return [self.demoData.avatars objectForKey:message.senderId];
+*/
+    return [_modelData avatarForMessageSender:message];
 }
 
 - (NSAttributedString *)collectionView:(JSQMessagesCollectionView *)collectionView attributedTextForCellTopLabelAtIndexPath:(NSIndexPath *)indexPath
 {
-    /**
-     *  This logic should be consistent with what you return from `heightForCellTopLabelAtIndexPath:`
-     *  The other label text delegate methods should follow a similar pattern.
-     *
-     *  Show a timestamp for every 3rd message
-     */
-    if (indexPath.item % 3 == 0) {
-        JSQMessage *message = [self.demoData.messages objectAtIndex:indexPath.item];
-        return [[JSQMessagesTimestampFormatter sharedFormatter] attributedTimestampForDate:message.date];
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    JSQMessage *message = [_modelData messageAtIndexPath:indexPath];
+    if (message == nil)
+    {
+        return nil;
     }
-    
-    return nil;
+    return [[JSQMessagesTimestampFormatter sharedFormatter] attributedTimestampForDate:[message date]];
 }
 
 - (NSAttributedString *)collectionView:(JSQMessagesCollectionView *)collectionView attributedTextForMessageBubbleTopLabelAtIndexPath:(NSIndexPath *)indexPath
 {
-    JSQMessage *message = [self.demoData.messages objectAtIndex:indexPath.item];
-    
-    /**
-     *  iOS7-style sender name labels
-     */
-    if ([message.senderId isEqualToString:self.senderId]) {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    JSQMessage *message = [_modelData messageAtIndexPath:indexPath];
+    if ((message != nil) && [[message senderId] isEqualToString:[self senderId]])
+    {
         return nil;
     }
-    
-    if (indexPath.item - 1 > 0) {
-        JSQMessage *previousMessage = [self.demoData.messages objectAtIndex:indexPath.item - 1];
-        if ([[previousMessage senderId] isEqualToString:message.senderId]) {
-            return nil;
-        }
+    JSQMessage *previousMessage = [_modelData previousMessageAtIndexPath:indexPath];
+    if ((previousMessage != nil) && (message != nil) && [[previousMessage senderId] isEqualToString:[message senderId]])
+    {
+        return nil;
     }
-    
-    /**
-     *  Don't specify attributes to use the defaults.
-     */
     return [[NSAttributedString alloc] initWithString:message.senderDisplayName];
 }
-
 - (NSAttributedString *)collectionView:(JSQMessagesCollectionView *)collectionView attributedTextForCellBottomLabelAtIndexPath:(NSIndexPath *)indexPath
 {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
     return nil;
 }
-
-#pragma mark - UICollectionView DataSource
-
+#pragma mark - DATASOURCE: UICollectionView
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section
 {
-    return [self.demoData.messages count];
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    return [_modelData messagesCount];
 }
-
 - (UICollectionViewCell *)collectionView:(JSQMessagesCollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath
 {
-    /**
-     *  Override point for customizing cells
-     */
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
     JSQMessagesCollectionViewCell *cell = (JSQMessagesCollectionViewCell *)[super collectionView:collectionView cellForItemAtIndexPath:indexPath];
-    
     /**
      *  Configure almost *anything* on the cell
      *
@@ -405,154 +351,163 @@
      *  Instead, override the properties you want on `self.collectionView.collectionViewLayout` from `viewDidLoad`
      */
     
-    JSQMessage *msg = [self.demoData.messages objectAtIndex:indexPath.item];
-    
-    if (!msg.isMediaMessage) {
-        
-        if ([msg.senderId isEqualToString:self.senderId]) {
-            cell.textView.textColor = [UIColor blackColor];
+    JSQMessage *message = [_modelData messageAtIndexPath:indexPath];
+    if ((message != nil) && ![message isMediaMessage])
+    {
+        if ([[message senderId] isEqualToString:[self senderId]])
+        {
+            [[cell textView] setTextColor:[UIColor blackColor]];
         }
-        else {
-            cell.textView.textColor = [UIColor whiteColor];
+        else
+        {
+            [[cell textView] setTextColor:[UIColor whiteColor]];
         }
-        
-        cell.textView.linkTextAttributes = @{ NSForegroundColorAttributeName : cell.textView.textColor,
-                                              NSUnderlineStyleAttributeName : @(NSUnderlineStyleSingle | NSUnderlinePatternSolid) };
+        [[cell textView] setLinkTextAttributes:@{ NSForegroundColorAttributeName : [[cell textView] textColor],
+                                              NSUnderlineStyleAttributeName : @(NSUnderlineStyleSingle | NSUnderlinePatternSolid) }];
     }
-    
     return cell;
 }
-
-
-
-#pragma mark - UICollectionView Delegate
-
+#pragma mark - DELEGATE: UICollectionView
 #pragma mark - Custom menu items
-
 - (BOOL)collectionView:(UICollectionView *)collectionView canPerformAction:(SEL)action forItemAtIndexPath:(NSIndexPath *)indexPath withSender:(id)sender
 {
-    if (action == @selector(customAction:)) {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    if (action == @selector(customAction:))
+    {
         return YES;
     }
     
     return [super collectionView:collectionView canPerformAction:action forItemAtIndexPath:indexPath withSender:sender];
 }
-
 - (void)collectionView:(UICollectionView *)collectionView performAction:(SEL)action forItemAtIndexPath:(NSIndexPath *)indexPath withSender:(id)sender
 {
-    if (action == @selector(customAction:)) {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    if (action == @selector(customAction:))
+    {
         [self customAction:sender];
         return;
     }
-    
     [super collectionView:collectionView performAction:action forItemAtIndexPath:indexPath withSender:sender];
 }
-
 - (void)customAction:(id)sender
 {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+#if DEBUG >= LOCAL_LEVEL_2
     NSLog(@"Custom action received! Sender: %@", sender);
-    
-    [[[UIAlertView alloc] initWithTitle:@"Custom Action"
-                                message:nil
-                               delegate:nil
-                      cancelButtonTitle:@"OK"
-                      otherButtonTitles:nil]
-     show];
+#endif
 }
-
-
-
-#pragma mark - JSQMessages collection view flow layout delegate
-
+#pragma mark - DELEGATE: JSQMessages collection view flow layout
 #pragma mark - Adjusting cell label heights
-
 - (CGFloat)collectionView:(JSQMessagesCollectionView *)collectionView
                    layout:(JSQMessagesCollectionViewFlowLayout *)collectionViewLayout heightForCellTopLabelAtIndexPath:(NSIndexPath *)indexPath
 {
-    /**
-     *  Each label in a cell has a `height` delegate method that corresponds to its text dataSource method
-     */
-    
-    /**
-     *  This logic should be consistent with what you return from `attributedTextForCellTopLabelAtIndexPath:`
-     *  The other label height delegate methods should follow similarly
-     *
-     *  Show a timestamp for every 3rd message
-     */
-    if (indexPath.item % 3 == 0) {
-        return kJSQMessagesCollectionViewCellLabelHeightDefault;
-    }
-    
-    return 0.0f;
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    return kJSQMessagesCollectionViewCellLabelHeightDefault;
 }
-
 - (CGFloat)collectionView:(JSQMessagesCollectionView *)collectionView
                    layout:(JSQMessagesCollectionViewFlowLayout *)collectionViewLayout heightForMessageBubbleTopLabelAtIndexPath:(NSIndexPath *)indexPath
 {
-    /**
-     *  iOS7-style sender name labels
-     */
-    JSQMessage *currentMessage = [self.demoData.messages objectAtIndex:indexPath.item];
-    if ([[currentMessage senderId] isEqualToString:self.senderId]) {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    JSQMessage *message = [_modelData messageAtIndexPath:indexPath];
+    if ((message == nil) || [[message senderId] isEqualToString:[self senderId]])
+    {
         return 0.0f;
     }
-    
-    if (indexPath.item - 1 > 0) {
-        JSQMessage *previousMessage = [self.demoData.messages objectAtIndex:indexPath.item - 1];
-        if ([[previousMessage senderId] isEqualToString:[currentMessage senderId]]) {
-            return 0.0f;
-        }
+    JSQMessage *previousMessage = [_modelData previousMessageAtIndexPath:indexPath];
+    if ((previousMessage != nil) && [[previousMessage senderId] isEqualToString:[message senderId]])
+    {
+        return 0.0f;
     }
-    
     return kJSQMessagesCollectionViewCellLabelHeightDefault;
 }
-
 - (CGFloat)collectionView:(JSQMessagesCollectionView *)collectionView
                    layout:(JSQMessagesCollectionViewFlowLayout *)collectionViewLayout heightForCellBottomLabelAtIndexPath:(NSIndexPath *)indexPath
 {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
     return 0.0f;
 }
-
 #pragma mark - Responding to collection view tap events
-
 - (void)collectionView:(JSQMessagesCollectionView *)collectionView
                 header:(JSQMessagesLoadEarlierHeaderView *)headerView didTapLoadEarlierMessagesButton:(UIButton *)sender
 {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+#if DEBUG >= LOCAL_LEVEL_2
     NSLog(@"Load earlier messages!");
+#endif
 }
-
 - (void)collectionView:(JSQMessagesCollectionView *)collectionView didTapAvatarImageView:(UIImageView *)avatarImageView atIndexPath:(NSIndexPath *)indexPath
 {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+#if DEBUG >= LOCAL_LEVEL_2
     NSLog(@"Tapped avatar!");
+#endif
 }
-
 - (void)collectionView:(JSQMessagesCollectionView *)collectionView didTapMessageBubbleAtIndexPath:(NSIndexPath *)indexPath
 {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+#if DEBUG >= LOCAL_LEVEL_2
     NSLog(@"Tapped message bubble!");
+#endif
 }
-
 - (void)collectionView:(JSQMessagesCollectionView *)collectionView didTapCellAtIndexPath:(NSIndexPath *)indexPath touchLocation:(CGPoint)touchLocation
 {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+#if DEBUG >= LOCAL_LEVEL_2
     NSLog(@"Tapped cell at %@!", NSStringFromCGPoint(touchLocation));
+#endif
 }
-
 #pragma mark - JSQMessagesComposerTextViewPasteDelegate methods
-
-
 - (BOOL)composerTextView:(JSQMessagesComposerTextView *)textView shouldPasteWithSender:(id)sender
 {
-    if ([UIPasteboard generalPasteboard].image) {
-        // If there's an image in the pasteboard, construct a media item with that image and `send` it.
-        JSQPhotoMediaItem *item = [[JSQPhotoMediaItem alloc] initWithImage:[UIPasteboard generalPasteboard].image];
-        JSQMessage *message = [[JSQMessage alloc] initWithSenderId:self.senderId
-                                                 senderDisplayName:self.senderDisplayName
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    if ([[UIPasteboard generalPasteboard] image])
+    {
+// If there's an image in the pasteboard, construct a media item with that image and `send` it.
+        JSQPhotoMediaItem *item = [[JSQPhotoMediaItem alloc] initWithImage:[[UIPasteboard generalPasteboard] image]];
+        JSQMessage *message = [[JSQMessage alloc] initWithSenderId:[self senderId]
+                                                 senderDisplayName:[self senderDisplayName]
                                                               date:[NSDate date]
                                                              media:item];
-        [self.demoData.messages addObject:message];
-        [self finishSendingMessage];
+        __weak typeof(self) weakSelf = self;
+        [_modelData sendMessage:message withCompletion:^(BOOL success, NSError *error) {
+            if (success)
+            {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [weakSelf finishSendingMessageAnimated:YES];
+                });
+            }
+        }];
         return NO;
     }
     return YES;
 }
-
+#pragma mark - DELEGATE: ModelData
+- (void)receiveMessage:(JSQMessage *)message
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+}
 @end

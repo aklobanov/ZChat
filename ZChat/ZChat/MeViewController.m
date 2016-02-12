@@ -7,8 +7,8 @@
 //
 
 #import "MeViewController.h"
-#import "DataModel.h"
-#import "NXOAuth2.h"
+//#import "DataModel.h"
+//#import "NXOAuth2.h"
 #import "SWRevealViewController.h"
 
 #define LOCAL_LEVEL_0 0
@@ -69,6 +69,7 @@
         NSLog(@"SCROLL VIEW=%@\nCONTENT VIEW=%@",[[self view] debugDescription],[_contentView debugDescription]);
 #endif
     }
+/*
     __weak typeof(self) weakSelf = self;
     [DataModel fetchMe:_image completion:^(NSString *userName, NSString *profileUrl, NSString *billingUrl) {
         __strong typeof(self) strongSelf = weakSelf;
@@ -78,6 +79,7 @@
             [strongSelf->_name setText:[userName uppercaseStringWithLocale:[NSLocale currentLocale]]];
         });
     }];
+*/
 }
 - (void)dealloc
 {
@@ -129,21 +131,25 @@
 #if DEBUG >= LOCAL_LEVEL_1
     NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
 #endif
+/*
     NSURL *url = [DataModel urlForGotTo:_profileUrl];
     if (url != nil)
     {
         [[UIApplication sharedApplication] openURL:url];
     }
+*/
 }
 - (IBAction)doSignout:(UIButton *)sender
 {
 #if DEBUG >= LOCAL_LEVEL_1
     NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
 #endif
+/*
     NXOAuth2Account *account = (NXOAuth2Account *)[[[NXOAuth2AccountStore sharedStore] accountsWithAccountType:@"MHD"] lastObject];
     if (account != nil)
     {
         [[NXOAuth2AccountStore sharedStore] removeAccount:account];
     }
+*/
 }
 @end

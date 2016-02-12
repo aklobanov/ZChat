@@ -7,31 +7,18 @@
 //
 
 #import <Foundation/Foundation.h>
-#import <UIKit/UIKit.h>
-#import <CoreLocation/CoreLocation.h>
+//#import <UIKit/UIKit.h>
+//#import <CoreLocation/CoreLocation.h>
 
-#import "JSQMessages.h"
-
-/**
- *  This is for demo/testing purposes only. 
- *  This object sets up some fake model data.
- *  Do not actually do anything like this.
- */
-
-static NSString * const kJSQDemoAvatarDisplayNameSquires = @"Jesse Squires";
-static NSString * const kJSQDemoAvatarDisplayNameCook = @"Tim Cook";
-static NSString * const kJSQDemoAvatarDisplayNameJobs = @"Jobs";
-static NSString * const kJSQDemoAvatarDisplayNameWoz = @"Steve Wozniak";
-
-static NSString * const kJSQDemoAvatarIdSquires = @"053496-4509-289";
-static NSString * const kJSQDemoAvatarIdCook = @"468-768355-23123";
-static NSString * const kJSQDemoAvatarIdJobs = @"707-8956784-57";
-static NSString * const kJSQDemoAvatarIdWoz = @"309-41802-93823";
-
-
+#import "JSQMessage.h"
+#import "JSQMessageAvatarImageDataSource.h"
+@protocol ModelDataProtocol <NSObject>
+@required
+- (void)receiveMessage:(JSQMessage *)message;
+@end
 
 @interface ModelData : NSObject
-
+/*
 @property (strong, nonatomic) NSMutableArray *messages;
 
 @property (strong, nonatomic) NSDictionary *avatars;
@@ -47,5 +34,15 @@ static NSString * const kJSQDemoAvatarIdWoz = @"309-41802-93823";
 - (void)addLocationMediaMessageCompletion:(JSQLocationMediaItemCompletionBlock)completion;
 
 - (void)addVideoMediaMessage;
-
+*/
+@property (weak, nonatomic) id <ModelDataProtocol> delegate;
++ (ModelData *)sharedModelData;
+// Data Source
+- (NSInteger)messagesCount;
+- (JSQMessage *)messageAtIndexPath:(NSIndexPath *)indexPath;
+- (JSQMessage *)previousMessageAtIndexPath:(NSIndexPath *)indexPath;
+- (void)deleteMessageAtIndexPath:(NSIndexPath *)indexPath;
+- (id<JSQMessageAvatarImageDataSource>)avatarForMessageSender:(JSQMessage *)message;
+// Communication
+- (void)sendMessage:(JSQMessage *)message withCompletion:(void (^)(BOOL success,NSError *error))completion;
 @end

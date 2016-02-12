@@ -77,21 +77,10 @@
 		5C1D06981C63B3130002F93E /* ZChat */ = {
 			isa = PBXGroup;
 			children = (
-				5CE860861C6CA47D00D7EAC4 /* ModelData.h */,
-				5CE860871C6CA47D00D7EAC4 /* ModelData.m */,
-				5CE860831C6C6ECA00D7EAC4 /* MeViewController.h */,
-				5CE860841C6C6ECA00D7EAC4 /* MeViewController.m */,
-				5CE860801C6C6D3800D7EAC4 /* MyNavigationController.h */,
-				5CE860811C6C6D3800D7EAC4 /* MyNavigationController.m */,
-				5CE8607D1C6C6BD900D7EAC4 /* MainViewController.h */,
-				5CE8607E1C6C6BD900D7EAC4 /* MainViewController.m */,
+				5CE8608C1C6DFD0B00D7EAC4 /* Model */,
+				5CE860891C6DFCC400D7EAC4 /* UI */,
 				5C1D069C1C63B3130002F93E /* AppDelegate.h */,
 				5C1D069D1C63B3130002F93E /* AppDelegate.m */,
-				5C1D069F1C63B3130002F93E /* MessageViewController.h */,
-				5C1D06A01C63B3130002F93E /* MessageViewController.m */,
-				5C1D06A21C63B3130002F93E /* Main.storyboard */,
-				5C1D06A51C63B3130002F93E /* Assets.xcassets */,
-				5C1D06A71C63B3130002F93E /* LaunchScreen.storyboard */,
 				5C1D06AA1C63B3130002F93E /* Info.plist */,
 				5C1D06991C63B3130002F93E /* Supporting Files */,
 			);
@@ -104,6 +93,49 @@
 				5C1D069A1C63B3130002F93E /* main.m */,
 			);
 			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+		5CE860891C6DFCC400D7EAC4 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				5CE8608B1C6DFCEB00D7EAC4 /* Resources */,
+				5CE8608A1C6DFCD100D7EAC4 /* Controllers */,
+			);
+			name = UI;
+			sourceTree = "<group>";
+		};
+		5CE8608A1C6DFCD100D7EAC4 /* Controllers */ = {
+			isa = PBXGroup;
+			children = (
+				5CE860831C6C6ECA00D7EAC4 /* MeViewController.h */,
+				5CE860841C6C6ECA00D7EAC4 /* MeViewController.m */,
+				5CE860801C6C6D3800D7EAC4 /* MyNavigationController.h */,
+				5CE860811C6C6D3800D7EAC4 /* MyNavigationController.m */,
+				5CE8607D1C6C6BD900D7EAC4 /* MainViewController.h */,
+				5CE8607E1C6C6BD900D7EAC4 /* MainViewController.m */,
+				5C1D069F1C63B3130002F93E /* MessageViewController.h */,
+				5C1D06A01C63B3130002F93E /* MessageViewController.m */,
+			);
+			name = Controllers;
+			sourceTree = "<group>";
+		};
+		5CE8608B1C6DFCEB00D7EAC4 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				5C1D06A21C63B3130002F93E /* Main.storyboard */,
+				5C1D06A71C63B3130002F93E /* LaunchScreen.storyboard */,
+				5C1D06A51C63B3130002F93E /* Assets.xcassets */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		5CE8608C1C6DFD0B00D7EAC4 /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				5CE860861C6CA47D00D7EAC4 /* ModelData.h */,
+				5CE860871C6CA47D00D7EAC4 /* ModelData.m */,
+			);
+			name = Model;
 			sourceTree = "<group>";
 		};
 		7C8A6EA42BF1F2DCB5863857 /* Frameworks */ = {

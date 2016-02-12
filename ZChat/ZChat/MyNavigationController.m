@@ -10,10 +10,11 @@
 
 #define LOCAL_LEVEL_0 0
 #define LOCAL_LEVEL_1 1
-#define LOCAL_LEVEL_2 1
+#define LOCAL_LEVEL_2 2
 
 @implementation MyNavigationController
 #pragma mark - INIT
+/*
 - (void)awakeFromNib
 {
 #if DEBUG >= LOCAL_LEVEL_1
@@ -27,6 +28,7 @@
     [[UINavigationBar appearance] setTitleTextAttributes:@{NSFontAttributeName:font}];
     [[UIBarButtonItem appearance] setTitleTextAttributes:@{NSFontAttributeName:font} forState:UIControlStateNormal];
 }
+*/
 #pragma mark - KEYBOARD
 - (BOOL)disablesAutomaticKeyboardDismissal
 {

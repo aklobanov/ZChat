@@ -7,25 +7,200 @@
 //
 
 #import "ModelData.h"
+#import <Realm/Realm.h>
+#import <CoreLocation/CoreLocation.h>
+#import "JSQMediaItem.h"
+#import "JSQPhotoMediaItem.h"
+#import "JSQVideoMediaItem.h"
+#import "JSQLocationMediaItem.h"
+
+#define LOCAL_LEVEL_0 0
+#define LOCAL_LEVEL_1 1
+#define LOCAL_LEVEL_2 2
 
 //#import "NSUserDefaults+DemoSettings.h"
 
+@interface Message : RLMObject
+@property NSString          *senderId;
+@property NSDate            *date;
+@property NSString          *text;
+@property NSData            *photo;
+@property NSString          *video;
+@property CLLocationDegrees latitude;
+@property CLLocationDegrees longitude;
+@end
+// This protocol enables typed collections. i.e.:
+// RLMArray<Message>
+RLM_ARRAY_TYPE(Message)
+@implementation Message
++ (nonnull NSArray<NSString *> *)indexedProperties
+{
+    return @[@"senderId",@"date"];
+}
+@end
 
-/**
- *  This is for demo/testing purposes only.
- *  This object sets up some fake model data.
- *  Do not actually do anything like this.
- */
+@interface User : RLMObject
+@property NSString          *senderId;
+@property NSString          *nickName;
+@property NSString          *firstName;
+@property NSString          *lastName;
+@property NSData            *avatar;
+@end
+RLM_ARRAY_TYPE(User)
+@implementation User
++ (nullable NSString *)primaryKey
+{
+    return @"senderId";
+}
++ (nonnull NSArray<NSString *> *)indexedProperties
+{
+    return @[@"nickName",@"firstName",@"lastName"];
+}
+@end
 
 @implementation ModelData
-
+{
+    RLMRealm *_realm;
+}
++ (ModelData *)sharedModelData
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    static ModelData *_modelData;
+    static dispatch_once_t onceModelData;
+    dispatch_once(&onceModelData, ^{
+        _modelData = [ModelData new];
+    });
+    return _modelData;
+}
 - (instancetype)init
 {
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
     self = [super init];
-    if (self) {
-        
+    if (self != nil)
+    {
+        _realm = [RLMRealm defaultRealm];
+    }
+    return self;
+}
+- (void)dealloc
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    _realm = nil;
+}
+- (NSInteger)messagesCount
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    RLMResults<Message *> *messages = [Message allObjects];
+    return [messages count];
+}
+- (JSQMessage *)messageWithRealmMessage:(Message *)msg
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    JSQMessage *message = nil;
+    User *user = [User objectForPrimaryKey:[msg senderId]];
+    NSString *senderDisplayName = [NSString stringWithFormat:@"%@ (%@ %@)",[user nickName],[user firstName],[user lastName]];
+    if ([msg text] != nil)
+    {
+        message = [[JSQMessage alloc] initWithSenderId:[msg senderId] senderDisplayName:senderDisplayName date:[msg date] text:[msg text]];
+    }
+    else
+    {
+        JSQMediaItem *item;
+        if ([msg photo] != nil)
+        {
+            UIImage *image = [UIImage imageWithData:[msg photo]];
+            item = [[JSQPhotoMediaItem alloc] initWithImage:image];
+        }
+        else
+        {
+            if ([msg video] != nil)
+            {
+                NSURL *url = [NSURL URLWithString:[msg video]];
+                item = [[JSQVideoMediaItem alloc] initWithFileURL:url isReadyToPlay:NO];
+            }
+            else
+            {
+                CLLocation *location = [[CLLocation alloc] initWithLatitude:[msg latitude] longitude:[msg longitude]];
+                item = [[JSQLocationMediaItem alloc] initWithLocation:location];
+            }
+        }
+        message = [[JSQMessage alloc] initWithSenderId:[msg senderId] senderDisplayName:senderDisplayName date:[msg date] media:item];
+    }
+    return message;
+}
+- (JSQMessage *)messageAtIndexPath:(NSIndexPath *)indexPath
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    RLMResults<Message *> *messages = [Message allObjects];
+    JSQMessage *message = nil;
+    if ([indexPath item] < [messages count])
+    {
+        Message *msg = [messages objectAtIndex:[indexPath item]];
+        if (msg != nil)
+        {
+            message = [self messageWithRealmMessage:msg];
+        }
+    }
+    return message;
+}
+- (JSQMessage *)previousMessageAtIndexPath:(NSIndexPath *)indexPath
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    RLMResults<Message *> *messages = [Message allObjects];
+    JSQMessage *message = nil;
+    NSInteger i = [indexPath item] - 1;
+    if ((i < [messages count]) && (i >= 0))
+    {
+        Message *msg = [messages objectAtIndex:i];
+        if (msg != nil)
+        {
+            message = [self messageWithRealmMessage:msg];
+        }
+    }
+    return message;
+}
+- (void)deleteMessageAtIndexPath:(NSIndexPath *)indexPath;
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    RLMResults<Message *> *messages = [Message allObjects];
+    Message *msg = [messages objectAtIndex:[indexPath item]];
+    [_realm beginWriteTransaction];
+    [_realm deleteObject:msg];
+    [_realm commitWriteTransaction];
+}
+- (id<JSQMessageAvatarImageDataSource>)avatarForMessageSender:(JSQMessage *)message
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    return nil;
+}
+- (void)sendMessage:(JSQMessage *)message withCompletion:(void (^)(BOOL success,NSError *error))completion
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    
+}
+
 //        if ([NSUserDefaults emptyMessagesSetting]) {
-            self.messages = [NSMutableArray new];
+//            self.messages = [NSMutableArray new];
 //        }
 //        else {
 //            [self loadFakeMessages];
@@ -39,6 +214,8 @@
          *
          *  If you are not using avatars, ignore this.
          */
+ /*
+        
         JSQMessagesAvatarImage *jsqImage = [JSQMessagesAvatarImageFactory avatarImageWithUserInitials:@"JSQ"
                                                                                       backgroundColor:[UIColor colorWithWhite:0.85f alpha:1.0f]
                                                                                             textColor:[UIColor colorWithWhite:0.60f alpha:1.0f]
@@ -72,14 +249,12 @@
          *  Be sure to create your bubble images one time and reuse them for good performance.
          *
          */
+/*
         JSQMessagesBubbleImageFactory *bubbleFactory = [[JSQMessagesBubbleImageFactory alloc] init];
         
         self.outgoingBubbleImageData = [bubbleFactory outgoingMessagesBubbleImageWithColor:[UIColor jsq_messageBubbleLightGrayColor]];
         self.incomingBubbleImageData = [bubbleFactory incomingMessagesBubbleImageWithColor:[UIColor jsq_messageBubbleGreenColor]];
-    }
-    
-    return self;
-}
+ */
 /*
 - (void)loadFakeMessages
 {
@@ -146,6 +321,7 @@
     }
 }
 */
+/*
 - (void)addPhotoMediaMessage
 {
     JSQPhotoMediaItem *photoItem = [[JSQPhotoMediaItem alloc] initWithImage:[UIImage imageNamed:@"goldengate"]];
@@ -179,5 +355,5 @@
                                                          media:videoItem];
     [self.messages addObject:videoMessage];
 }
-
+*/
 @end
