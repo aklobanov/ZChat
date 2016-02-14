@@ -73,6 +73,7 @@
 - (void)disconnectUserAtIndexPath:(NSIndexPath *)indexPath withCompletion:(void (^)(BOOL success,NSError *error))completion;
 // Communication
 - (void)publishMyselfWithName:(NSString *)name;
+- (void)publishMessage:(JSQMessage *)message withCompletion:(void (^)(BOOL success,NSError *error))completion;
 - (void)sendMessage:(JSQMessage *)message withCompletion:(void (^)(BOOL success,NSError *error))completion;
 - (void)stopReceiveMessages;
 - (void)startReceiveMessages;

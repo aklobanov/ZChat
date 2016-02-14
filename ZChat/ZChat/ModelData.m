@@ -541,6 +541,73 @@ static NSString *txtUserIdKey = @"UUID";
         }
     });
 }
+typedef NS_ENUM(char,MessageType)
+{
+    kMessageAcknowlegment = -1,
+    kMessageSystem = 0,
+    kMessageText,
+    kMessagePhoto,
+    kMessageVideo,
+    kMessageLocation,
+    kMessageOther
+};
+- (NSData *)zmqDataFromMessage:(JSQMessage *)message
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    uuid_t _uuid;
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:[message senderId]];
+    [uuid getUUIDBytes:_uuid];
+    NSMutableData *data = [NSMutableData dataWithBytes:_uuid length:sizeof(uuid_t)];
+    NSTimeInterval _date = [[message date] timeIntervalSince1970];
+    [data appendBytes:&_date length:sizeof(NSTimeInterval)];
+    char messageType = kMessageOther;
+    if ([message isMediaMessage])
+    {
+        if ([[message media] isKindOfClass:[JSQPhotoMediaItem class]])
+        {
+            messageType = kMessagePhoto;
+            [data appendBytes:&messageType length:1];
+            [data appendData:UIImageJPEGRepresentation([(JSQPhotoMediaItem *)[message media] image], 1.0f)];
+        }
+        else
+        {
+            if ([[message media] isKindOfClass:[JSQVideoMediaItem class]])
+            {
+                messageType = kMessageVideo;
+                [data appendBytes:&messageType length:1];
+                const char *str = [[[(JSQVideoMediaItem *)[message media] fileURL] absoluteString] cStringUsingEncoding:NSUTF8StringEncoding];
+                [data appendBytes:str length:strlen(str)];
+            }
+            else
+            {
+                if ([[message media] isKindOfClass:[JSQLocationMediaItem class]])
+                {
+                    messageType = kMessageLocation;
+                    [data appendBytes:&messageType length:1];
+                    CLLocationCoordinate2D coordinate = [(JSQLocationMediaItem *)[message media] coordinate];
+                    [data appendBytes:&coordinate length:sizeof(CLLocationCoordinate2D)];
+                }
+                else
+                {
+                    messageType = kMessageOther;
+                    [data appendBytes:&messageType length:1];
+                    NSData *mediaData = [NSKeyedArchiver archivedDataWithRootObject:[message media]];
+                    [data appendData:mediaData];
+                }
+            }
+        }
+    }
+    else
+    {
+        messageType = kMessageText;
+        [data appendBytes:&messageType length:1];
+        const char *str = [[message text] cStringUsingEncoding:NSUTF8StringEncoding];
+        [data appendBytes:str length:strlen(str)];
+    }
+    return data;
+}
 - (void)sendMessage:(JSQMessage *)message withCompletion:(void (^)(BOOL success,NSError *error))completion
 {
 #if DEBUG >= LOCAL_LEVEL_1
@@ -561,6 +628,64 @@ static NSString *txtUserIdKey = @"UUID";
         }
     }
     NSData *data = [NSKeyedArchiver archivedDataWithRootObject:message];
+#if DEBUG >= LOCAL_LEVEL_2
+    NSLog(@"DATA TO SEND=%@", [data debugDescription]);
+#endif
+    __weak typeof(self) weakSelf = self;
+    [_outSocket sendAsyncData:data withPartSize:1024 withCompletion:^(BOOL success, ZMQError *error) {
+        if (success)
+        {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(self) strongSelf = weakSelf;
+                Message *msg = [strongSelf realmMessageWithMessage:message isOutgoing:YES];
+                NSError *error = nil;
+                if (![strongSelf->_realm transactionWithBlock:^{
+                    [strongSelf->_realm addObject:msg];
+                    if (completion != NULL)
+                    {
+                        completion(YES,nil);
+                    }
+                } error:&error])
+                {
+                    if (completion != NULL)
+                    {
+                        completion(NO,error);
+                    }
+                }
+            });
+        }
+        else
+        {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion != NULL)
+                {
+                    completion(NO,error);
+                }
+            });
+        }
+    }];
+}
+- (void)publishMessage:(JSQMessage *)message withCompletion:(void (^)(BOOL success,NSError *error))completion
+{
+#if DEBUG >= LOCAL_LEVEL_1
+    NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
+#endif
+    if (_outqueue == nil)
+    {
+        _outqueue = dispatch_queue_create("_zmq_out_queue", DISPATCH_QUEUE_CONCURRENT);
+    }
+    if (_outSocket == nil)
+    {
+        _outSocket = [_context socketWithType:kZMQSocketReq onQueue:_outqueue];
+        ZMQError *error = nil;
+        if (![_outSocket bindSyncWithEndPoint:[ZMQEndPoint tcpEndPointWithAddress:@"*" withPort:[_me port]] withError:&error])
+        {
+            [error report];
+            return;
+        }
+    }
+//    NSData *data = [NSKeyedArchiver archivedDataWithRootObject:message];
+    NSData *data = [self zmqDataFromMessage:message];
 #if DEBUG >= LOCAL_LEVEL_2
     NSLog(@"DATA TO SEND=%@", [data debugDescription]);
 #endif
@@ -682,6 +807,50 @@ static NSString *txtUserIdKey = @"UUID";
     NSLog(@"REMOVE SERVICE=(%@ %@.%@%@:%li) IS MORE=%li",[[service addresses] debugDescription],[service name],[service type],[service domain],(long)[service port],(long)moreComing);
 #endif
     [_zchats removeObject:service];
+    NSData *txtRecord = [service TXTRecordData];
+    if (txtRecord != nil)
+    {
+        NSDictionary *dic = [NSNetService dictionaryFromTXTRecordData:txtRecord];
+        if (dic != nil)
+        {
+            NSData *txtData = dic[txtUserIdKey];
+            if (txtData != nil)
+            {
+                NSUUID *uuid = [[NSUUID alloc] initWithUUIDBytes:[txtData bytes]];
+                NSString *userId = [uuid UUIDString];
+#if DEBUG >= LOCAL_LEVEL_2
+                NSLog(@"SERVICE UUID=%@", userId);
+#endif
+                __weak typeof(self) weaskSelf = self;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    __strong typeof(self) strongSelf = weaskSelf;
+                    User *user = [User objectForPrimaryKey:userId];
+                    if (user != nil)
+                    {
+                        NSIndexPath *indexPath = [strongSelf indexPathForUser:user];
+                        if (indexPath != nil)
+                        {
+                            [strongSelf disconnectUserAtIndexPath:indexPath withCompletion:^(BOOL success, NSError *error) {
+                                if (success)
+                                {
+                                    if (strongSelf->_delegateUsers != nil)
+                                    {
+                                        dispatch_async(dispatch_get_main_queue(), ^{
+                                            [strongSelf->_delegateUsers updateUserAtIndexPath:indexPath];
+                                        });
+                                   }
+                                }
+                                else
+                                {
+                                    [error report];
+                                }
+                            }];
+                        }
+                    }
+                });
+            }
+        }
+    }
 }
 - (void)netServiceBrowserDidStopSearch:(NSNetServiceBrowser *)browser
 {
@@ -689,6 +858,7 @@ static NSString *txtUserIdKey = @"UUID";
     NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
 #endif
 }
+/*
 - (void)netServiceBrowserWillSearch:(NSNetServiceBrowser *)browser
 {
 #if DEBUG >= LOCAL_LEVEL_1
@@ -701,6 +871,7 @@ static NSString *txtUserIdKey = @"UUID";
     NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
 #endif
 }
+*/
 - (void)netServiceDidResolveAddress:(NSNetService *)sender
 {
 #if DEBUG >= LOCAL_LEVEL_1
@@ -756,11 +927,15 @@ static NSString *txtUserIdKey = @"UUID";
                                 [_realm commitWriteTransaction];
                                 if (_delegateUsers != nil)
                                 {
-                                    NSIndexPath *indexPath = [self indexPathForUser:user];
-                                    if (indexPath != nil)
-                                    {
-                                        [_delegateUsers addUserAtIndexPath:indexPath];
-                                    }
+                                    __weak typeof(self) weaskSelf = self;
+                                    dispatch_async(dispatch_get_main_queue(), ^{
+                                        __strong typeof(self) strongSelf = weaskSelf;
+                                        NSIndexPath *indexPath = [strongSelf indexPathForUser:user];
+                                        if (indexPath != nil)
+                                        {
+                                            [strongSelf->_delegateUsers addUserAtIndexPath:indexPath];
+                                        }
+                                    });
                                 }
                             }
                             else
@@ -779,11 +954,15 @@ static NSString *txtUserIdKey = @"UUID";
                                 [_realm commitWriteTransaction];
                                 if (_delegateUsers != nil)
                                 {
-                                    NSIndexPath *indexPath = [self indexPathForUser:user];
-                                    if (indexPath != nil)
-                                    {
-                                        [_delegateUsers updateUserAtIndexPath:indexPath];
-                                    }
+                                    __weak typeof(self) weaskSelf = self;
+                                    dispatch_async(dispatch_get_main_queue(), ^{
+                                        __strong typeof(self) strongSelf = weaskSelf;
+                                        NSIndexPath *indexPath = [strongSelf indexPathForUser:user];
+                                        if (indexPath != nil)
+                                        {
+                                            [strongSelf->_delegateUsers updateUserAtIndexPath:indexPath];
+                                        }
+                                    });
                                 }
                             }
                         }
