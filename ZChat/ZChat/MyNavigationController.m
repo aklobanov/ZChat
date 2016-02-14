@@ -38,6 +38,7 @@
     return NO;
 }
 #pragma mark - ROTATION
+/*
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations
 {
 #if DEBUG >= LOCAL_LEVEL_1
@@ -52,4 +53,5 @@
 #endif
     return [[self topViewController] shouldAutorotate];
 }
+*/
 @end

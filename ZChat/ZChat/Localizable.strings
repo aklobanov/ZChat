@@ -1,0 +1,25 @@
+/* 
+  Localizable.strings
+  ZChat
+
+  Created by ALEXEY LOBANOV on 13.02.16.
+  Copyright © 2016 Blue Skies Software. All rights reserved.
+*/
+// Alert buttons
+"OK" = "OK";
+"YES" = "YES";
+"CANCEL" = "CANCEL";
+"NO" = "NO";
+// Photo
+"P0" = "PHOTO LIBRARY";
+"P1" = "Select photo";
+"P2" = "Use selected photo";
+"P3" = "Camera isn't available to take photos";
+"P4" = "ORIGINAL PHOTO";
+"P5" = "Original photo was changed but wasn't updated. Update it in your work?";
+"P6" = "To select photos you need allow the application access to the photo library in the 'Settings' application. Go to the 'Settings' application?";
+"P7" = "To take photos you need allow the application access to the camera in the 'Settings' application. Go to the 'Settings' application?";
+// User
+"U0" = "ZCHAT USER";
+"U1" = "To start using ZChat you must enter chat's user name";
+"U2" = "SELECT A USER FOR ZCHAT";

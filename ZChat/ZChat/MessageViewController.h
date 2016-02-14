@@ -9,6 +9,6 @@
 #import <UIKit/UIKit.h>
 #import "JSQMessages.h"
 
-@interface MessageViewController : JSQMessagesViewController <UIActionSheetDelegate, JSQMessagesComposerTextViewPasteDelegate>
+@interface MessageViewController : JSQMessagesViewController <JSQMessagesComposerTextViewPasteDelegate>
 @end
 

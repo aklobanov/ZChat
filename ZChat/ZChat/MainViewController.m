@@ -16,6 +16,7 @@
 @end
 
 @implementation MainViewController
+/*
 #pragma mark - ROTATION
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations
 {
@@ -31,4 +32,5 @@
 #endif
     return [[self frontViewController] shouldAutorotate];
 }
+*/
 @end

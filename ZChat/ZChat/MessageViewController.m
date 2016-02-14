@@ -14,8 +14,9 @@
 #define LOCAL_LEVEL_1 1
 #define LOCAL_LEVEL_2 2
 
-@interface MessageViewController () <SWRevealViewControllerDelegate,ModelDataProtocol>
+@interface MessageViewController () <SWRevealViewControllerDelegate,ModelMessagesProtocol>
 @property (weak, nonatomic) IBOutlet UIBarButtonItem *revealButton;
+@property (weak, nonatomic) IBOutlet UIBarButtonItem *rightButton;
 @end
 
 @implementation MessageViewController
@@ -24,6 +25,8 @@
     JSQMessagesBubbleImage  *_outgoingBubbleImageData;
     JSQMessagesBubbleImage  *_incomingBubbleImageData;
 }
+@synthesize revealButton = _revealButton;
+@synthesize rightButton  = _rightButton;
 #pragma mark - VIEW
 - (void)awakeFromNib
 {
@@ -42,22 +45,28 @@
     NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
 #endif
     [super viewDidLoad];
+    [self setSenderId:[[[UIDevice currentDevice] identifierForVendor] UUIDString]];
+    [self setSenderDisplayName:[self senderId]];
     SWRevealViewController *revealViewController = [self revealViewController];
     if (revealViewController != nil)
     {
         [_revealButton setTarget: revealViewController];
         [_revealButton setAction: @selector(revealToggle:)];
+        [_rightButton setTarget: revealViewController];
+        [_rightButton setAction: @selector(rightRevealToggle:)];
         [[[self navigationController] navigationBar] addGestureRecognizer:[revealViewController panGestureRecognizer]];
         [[[self navigationController] navigationBar] addGestureRecognizer:[revealViewController tapGestureRecognizer]];
         [revealViewController setDelegate:self];
     }
-    [_modelData setDelegate:self];
+    [_modelData setDelegateMessages:self];
+    [_modelData startReceiveMessages];
 }
 - (void)dealloc
 {
 #if DEBUG >= LOCAL_LEVEL_1
     NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
 #endif
+    [_modelData stopReceiveMessages];
     _modelData = nil;
 }
 - (void)didReceiveMemoryWarning
@@ -68,6 +77,7 @@
     [super didReceiveMemoryWarning];
 }
 #pragma mark - ROTATION
+/*
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations
 {
 #if DEBUG >= LOCAL_LEVEL_1
@@ -82,6 +92,7 @@
 #endif
     return YES;
 }
+*/
 #pragma mark - DELEGATE: SWRevealViewController
 - (void)revealController:(SWRevealViewController *)revealController willMoveToPosition:(FrontViewPosition)position
 {
@@ -509,5 +520,7 @@
 #if DEBUG >= LOCAL_LEVEL_1
     NSLog(@"Running %@ '%@'", self.class, NSStringFromSelector(_cmd));
 #endif
+    [JSQSystemSoundPlayer jsq_playMessageReceivedSound];
+    [self finishReceivingMessageAnimated:YES];
 }
 @end
